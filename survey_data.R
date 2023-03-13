@@ -3,13 +3,16 @@
 ## Survey Data
 
 library(tidyverse)
+library(cowplot)
 library(MASS)
+library(rms)
+library(RColorBrewer)
 
 #read in data
 ## NOTE: personality trait questions have already been correctly recoded in Qualtrics accoding to 
 ## https://www.colby.edu/psych/wp-content/uploads/sites/50/2013/08/bfi2s-form.pdf
 ## DO NOT reverse-key items, it has already been done
-data <- (read.csv("/Users/andrewmcburney/Desktop/COGS_50.08/COGS+50.08_March+12,+2023_14.37.csv")[-c(1:2),-c(10:23)])
+data <- (read.csv("/Users/andrewmcburney/Desktop/COGS_50.08/COGS+50.08_March+13,+2023_08.59.csv")[-c(1:2),-c(10:23)])
 
 #recode the third impulse buy question
 data <- data%>%
@@ -67,23 +70,70 @@ avg_time
 cor_matrix <- cor(data3[,c(69:74)])
 cor_matrix
 
+cor_matrix2 <- cor(data3[,c("Q5.3","Q2.2_2", "Q2.2_3","extraversion", "agreeableness", "conscientiousness", "neg_emotionality", "open_mindedness", "impulse_buy_score")])
+cor_matrix2
 #check for nornal distributions using histogram plots
 {
-  ggplot()+
-  geom_histogram(data = data3, aes(x = Q2.1_1, y = after_stat(count)), fill = 'black', bins = 5)+
-    theme_pubr()
-    ggplot()+
-  geom_histogram(data = data3, aes(x = Q2.1_2, y = after_stat(count)), fill = 'black', bins = 5)+
-    theme_pubr()
-      ggplot()+
-  geom_histogram(data = data3, aes(x = Q2.1_3, y = after_stat(count)), fill = 'black', bins = 5)+
-    theme_pubr()
-        ggplot()+
-  geom_histogram(data = data3, aes(x = Q2.1_4, y = after_stat(count)), fill = 'black', bins = 5)+
-    theme_pubr()
-          ggplot()+
-  geom_histogram(data = data3, aes(x = Q2.1_5, y = after_stat(count)), fill = 'black', bins = 5)+
-    theme_pubr()
+  
+  ggplot(data3%>%
+    group_by(Q2.1_1)%>%
+    count())+
+  geom_col(aes(x = Q2.1_1, y=n), fill = 'black')+
+    geom_label(aes(x=Q2.1_1, y=n/2, label = n))+
+      scale_y_continuous(breaks = seq(0,150, 10))+
+  theme_cowplot()+
+  labs(title = "Count of Responses for\n 'I go online shopping to change my mood\n or take my mind off of other things.'")+
+  xlab("Answer")+
+  ylab("Count")+
+  theme(plot.title = element_text(hjust = 0.5))
+  
+  ggplot(data3%>%
+    group_by(Q2.1_2)%>%
+    count())+
+  geom_col(aes(x = Q2.1_2, y=n), fill = 'black')+
+    geom_label(aes(x=Q2.1_2, y=n/2, label = n))+
+    scale_y_continuous(breaks = seq(0,150, 10))+
+  theme_cowplot()+
+  labs(title = "Count of Responses for\n 'I feel a sense of excitement when\nI make an impulse purchase online.'")+
+  xlab("Answer")+
+  ylab("Count")+
+  theme(plot.title = element_text(hjust = 0.5))
+  
+  ggplot(data3%>%
+    group_by(Q2.1_3)%>%
+    count())+
+  geom_col(aes(x = Q2.1_3, y=n), fill = 'black')+
+    geom_label(aes(x=Q2.1_3, y=n/2, label = n))+
+    scale_y_continuous(breaks = seq(0,150, 10))+
+  theme_cowplot()+
+  labs(title = "Count of Responses for\n 'After I make an online impulse\npurchase I feel regret.'")+
+  xlab("Answer")+
+  ylab("Count")+
+  theme(plot.title = element_text(hjust = 0.5))
+  
+  ggplot(data3%>%
+    group_by(Q2.1_4)%>%
+    count())+
+  geom_col(aes(x = Q2.1_4, y=n), fill = 'black')+
+    geom_label(aes(x=Q2.1_4, y=n/2, label = n))+
+      scale_y_continuous(breaks = seq(0,150, 10))+
+  theme_cowplot()+
+  labs(title = "Count of Responses for\n 'I have difficulty controlling my urge\nto buy when I see a good offer online.'")+
+  xlab("Answer")+
+  ylab("Count")+
+  theme(plot.title = element_text(hjust = 0.5))
+    
+  ggplot(data3%>%
+    group_by(Q2.1_5)%>%
+    count())+
+  geom_col(aes(x = Q2.1_5, y=n), fill = 'black')+
+    geom_label(aes(x=Q2.1_5, y=n/2, label = n))+
+    scale_y_continuous(breaks = seq(0,150, 10))+
+  theme_cowplot()+
+  labs(title = "Count of Responses for\n 'When I see a good deal online,\nI tend to buy more than that I intended to buy.'")+
+  xlab("Answer")+
+  ylab("Count")+
+  theme(plot.title = element_text(hjust = 0.5))
           
 ggplot()+
   geom_histogram(data = data3, aes(x = impulse_buy_score), bins = 40)
@@ -99,54 +149,121 @@ ggplot()+
   geom_histogram(data = data3, aes(x = open_mindedness), bins = 40)
 }
 
-#linear model for total impulse buying score
-data_glm <- lm(impulse_buy_score ~ extraversion + agreeableness + conscientiousness + neg_emotionality + open_mindedness, data = data3)
+#count by class year
+class_year_count <- data3%>%
+  group_by(Q5.1)%>%
+  count()
 
+ggplot(class_year_count)+
+  geom_col(aes(x=Q5.1, y=n), fill = 'black')+
+  geom_label(aes(x=Q5.1, y=n/2, label = n))+
+  scale_y_continuous(breaks = seq(0,120, 10))+
+  scale_x_discrete(limits = seq(2021,2026, 1))+
+  theme_cowplot()+
+  labs(title = "Count of Responses by Class Year")+
+  xlab("Class Year")+
+  ylab("Count")+
+  theme(plot.title = element_text(hjust = 0.5))
+
+#no scientific notation
+options(scipen = 999)
+
+#linear model for total impulse buying score
+data_glm <- glm(impulse_buy_score ~ extraversion + agreeableness + conscientiousness + neg_emotionality + open_mindedness, data = data3)
 summary(data_glm)                  
 anova(data_glm)
+vip(data_glm)
+
+data_glm2 <- glm(impulse_buy_score ~ extraversion + agreeableness + conscientiousness + neg_emotionality + open_mindedness + Q5.3, data = data3)
+
+summary(data_glm2)                  
+anova(data_glm2)
+vip(data_glm2)
+
+data_glm3 <- glm(impulse_buy_score ~ extraversion + agreeableness + conscientiousness + neg_emotionality + open_mindedness + Q5.3 + Q2.3, data = data3)
+
+summary(data_glm3)                  
+anova(data_glm3)
+vip(data_glm3)
+
+data_glm4 <- glm(impulse_buy_score ~ extraversion + agreeableness + conscientiousness + neg_emotionality + open_mindedness + Q5.3 + Q2.3 + Q2.6, data = data3)
+
+summary(data_glm4)                  
+anova(data_glm4)
+vip(data_glm4)
+
+data_glm5 <- glm(impulse_buy_score ~ extraversion + agreeableness + conscientiousness + neg_emotionality + open_mindedness + Q5.3 + Q2.3 + Q2.6 + Q2.4, data = data3)
+
+summary(data_glm5)                  
+anova(data_glm5)
+vip(data_glm5)
+
+data_glm6 <- glm(impulse_buy_score ~ extraversion + agreeableness + conscientiousness + neg_emotionality + open_mindedness + Q5.3 + Q2.3 + Q2.6 + Q2.4 + Q2.2_2, data = data3)
+
+summary(data_glm6)                  
+anova(data_glm6)
+vip(data_glm6)
+
+data_glm7 <- glm(impulse_buy_score ~ extraversion + agreeableness + conscientiousness + neg_emotionality + open_mindedness + Q5.3 + Q2.3 + Q2.6 + Q2.4 + Q2.2_2 + Q2.2_3, data = data3)
+
+summary(data_glm7)                  
+anova(data_glm7)
+vip(data_glm7)
+
+data_glm8 <- glm(impulse_buy_score ~ extraversion + agreeableness + conscientiousness + neg_emotionality + open_mindedness + Q5.3 + Q2.3 + Q2.6 + Q2.4 + Q2.2_2 + Q2.2_3 + Q2.2_4, data = data3)
+
+summary(data_glm8)                  
+anova(data_glm8)
+vip(data_glm8)
+
+data_glm9 <- glm(impulse_buy_score ~ extraversion + agreeableness + conscientiousness + neg_emotionality + open_mindedness + Q5.3 + Q2.3 + Q2.6 + Q2.4 + Q2.2_2 + Q2.2_3 + Q2.2_4 + Q2.2_8, data = data3)
+
+summary(data_glm9)                  
+anova(data_glm9)
+vip(data_glm9)
 
 #plot linear regression model tests
 {
 par(mfrow = c(2, 4))
-hist(residuals(data_glm))
+hist(residuals(data_glm9))
 
 # Plot residuals vs. fitted values
-plot(data_glm$fitted.values, residuals(data_glm), xlab = "Fitted values", ylab = "Residuals")
+plot(data_glm9$fitted.values, residuals(data_glm9), xlab = "Fitted values", ylab = "Residuals")
 
 # Plot normal probability plot
-qqnorm(residuals(data_glm))
-qqline(residuals(data_glm))
+qqnorm(residuals(data_glm9))
+qqline(residuals(data_glm9))
 
 # Check assumptions of normality and linearity using residual vs predictor variable plots
-plot(data3$extraversion, residuals(data_glm), xlab = "extraversion", ylab = "Residuals")
-plot(data3$agreeableness, residuals(data_glm), xlab = "agreeableness", ylab = "Residuals")
-plot(data3$conscientiousness, residuals(data_glm), xlab = "conscientiousness", ylab = "Residuals")
-plot(data3$neg_emotionality, residuals(data_glm), xlab = "neg_emotionality", ylab = "Residuals")
-plot(data3$open_mindedness, residuals(data_glm), xlab = "open_mindedness", ylab = "Residuals")
+plot(data3$extraversion, residuals(data_glm9), xlab = "extraversion", ylab = "Residuals")
+plot(data3$agreeableness, residuals(data_glm9), xlab = "agreeableness", ylab = "Residuals")
+plot(data3$conscientiousness, residuals(data_glm9), xlab = "conscientiousness", ylab = "Residuals")
+plot(data3$neg_emotionality, residuals(data_glm9), xlab = "neg_emotionality", ylab = "Residuals")
+plot(data3$open_mindedness, residuals(data_glm9), xlab = "open_mindedness", ylab = "Residuals")
 }
 #export plots
 {
 jpeg("/Users/andrewmcburney/Desktop/COGS_50.08/linear_regression_tests.jpeg", width = 1200, height = 600)
 par(mfrow = c(2, 4))
-hist(residuals(data_glm))
+hist(residuals(data_glm9))
 
 # Plot residuals vs. fitted values
-plot(data_glm$fitted.values, residuals(data_glm), xlab = "Fitted values", ylab = "Residuals")
+plot(data_glm9$fitted.values, residuals(data_glm9), xlab = "Fitted values", ylab = "Residuals")
 
 # Plot normal probability plot
-qqnorm(residuals(data_glm))
-qqline(residuals(data_glm))
+qqnorm(residuals(data_glm9))
+qqline(residuals(data_glm9))
 
 # Check assumptions of normality and linearity using residual vs predictor variable plots
-plot(data3$extraversion, residuals(data_glm), xlab = "extraversion", ylab = "Residuals")
-plot(data3$agreeableness, residuals(data_glm), xlab = "agreeableness", ylab = "Residuals")
-plot(data3$conscientiousness, residuals(data_glm), xlab = "conscientiousness", ylab = "Residuals")
-plot(data3$neg_emotionality, residuals(data_glm), xlab = "neg_emotionality", ylab = "Residuals")
-plot(data3$open_mindedness, residuals(data_glm), xlab = "open_mindedness", ylab = "Residuals")
+plot(data3$extraversion, residuals(data_glm9), xlab = "extraversion", ylab = "Residuals")
+plot(data3$agreeableness, residuals(data_glm9), xlab = "agreeableness", ylab = "Residuals")
+plot(data3$conscientiousness, residuals(data_glm9), xlab = "conscientiousness", ylab = "Residuals")
+plot(data3$neg_emotionality, residuals(data_glm9), xlab = "neg_emotionality", ylab = "Residuals")
+plot(data3$open_mindedness, residuals(data_glm9), xlab = "open_mindedness", ylab = "Residuals")
 dev.off()
 }
 #variance inflation factor multicolinearity test
-vif(data_glm)
+vif(data_glm9)
 #low multicolinearity! linear regression model is stable.
 
 #linear model for Q2.1_1
