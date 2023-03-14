@@ -2,17 +2,23 @@
 ## COGS 50.08: Modeling Mind and Behavior
 ## Survey Data
 
+#libraries
+{
 library(tidyverse)
 library(cowplot)
 library(MASS)
 library(rms)
-library(RColorBrewer)
+library(vip)
+library(scales)
+library(knitr)
+library(ggpubr)
+}
 
 #read in data
 ## NOTE: personality trait questions have already been correctly recoded in Qualtrics accoding to 
 ## https://www.colby.edu/psych/wp-content/uploads/sites/50/2013/08/bfi2s-form.pdf
 ## DO NOT reverse-key items, it has already been done
-data <- (read.csv("/Users/andrewmcburney/Desktop/COGS_50.08/COGS+50.08_March+13,+2023_08.59.csv")[-c(1:2),-c(10:23)])
+data <- (read.csv("/Users/andrewmcburney/Desktop/COGS_50.08/COGS+50.08_March+13,+2023_21.50.csv")[-c(1:2),-c(10:23)])
 
 #recode the third impulse buy question
 data <- data%>%
@@ -41,22 +47,76 @@ data2 <- data%>%
 
 data3 <- na.omit(data2, cols=c(seq(Q2.1_1: Q2.2_8), seq(Q4.1 : Q4.30)))%>%
   filter_all(~ !(. %in% c(-99, 99)))%>%
-  mutate(seconds = as.integer(Duration..in.seconds.))
+  filter(Q5.1 != 2021)%>%
+  filter(Finished == 1)%>%
+  mutate(seconds = as.integer(Duration..in.seconds.))%>%
+    mutate(income = factor(case_when(
+    Q2.3 <= 50 ~ 1,
+    Q2.3 <= 100 & Q2.3 >50 ~ 2,
+    Q2.3 <= 200 & Q2.3 >100 ~ 3,
+    Q2.3 > 200 ~ 4), levels = seq(1,4,1)))
 
-avg_data <- data3%>%
+mean_data <- data3%>%
   ungroup()%>%
-  dplyr::summarize(avg_ext = mean(extraversion),
-            avg_agr = mean(agreeableness),
-            avg_con = mean(conscientiousness),
-            avg_neg = mean(neg_emotionality),
-            avg_ope = mean(open_mindedness),
-            avg_ipm = mean(impulse_buy_score),
-            sd_ext = sd(extraversion),
-            sd_agr = sd(agreeableness),
-            sd_con = sd(conscientiousness),
-            sd_neg = sd(neg_emotionality),
-            sd_ope = sd(open_mindedness),
-            sd_ipm = sd(impulse_buy_score))
+  dplyr::summarize(ext = mean(extraversion),
+            agr = mean(agreeableness),
+            con = mean(conscientiousness),
+            neg = mean(neg_emotionality),
+            ope = mean(open_mindedness),
+            ipm = mean(impulse_buy_score))
+
+sd_data <- data3%>%
+  ungroup()%>%
+  dplyr::summarize(ext = sd(extraversion),
+            agr = sd(agreeableness),
+            con = sd(conscientiousness),
+            neg = sd(neg_emotionality),
+            ope = sd(open_mindedness),
+            ipm = sd(impulse_buy_score))
+
+#descriptive stat table
+descriptive_stats_vars <- rbind(count = nrow(data3), mean = round(mean_data, 2), sd = round(sd_data, 2))%>%t()%>%data.frame()
+#rename rows
+rownames(descriptive_stats_vars) <- c("Extraversion","Agreeableness", "Conscientiousness",   "Negative Emotionality", "Open-Mindedness", "Impulsive Buying Score")
+#output to Latex
+kable(descriptive_stats_vars, format = "latex")
+
+ggplot(descriptive_stats_vars)+
+geom_errorbar(aes(x = factor(rownames(descriptive_stats_vars)), y = mean, ymin = mean - sd, ymax = mean + sd), width = 0.2)+
+  geom_point(aes(x = factor(rownames(descriptive_stats_vars)), y = mean), size = 4)+
+  ylim(1,5)+
+  labs(title = "Mean and Standard Deviations of\nPersonality Traits and Impulsive Buying Score")+
+  xlab("Variable")+
+  ylab("Score")+
+  scale_x_discrete(labels = c("Agreeableness", "Conscientiousness", "Extraversion", "Impulsive\nBuying\nScore", "Negative\nEmotionality", "Open\nMindedness"))+
+  theme_pubr()+
+  theme(plot.title = element_text(hjust = 0.5, size = 16, face = "bold"))+
+  coord_flip()
+
+income_groups <- data3%>%
+  group_by(income)%>%
+  count()
+colnames(income_groups) <- c("Disposable Income", "# Students")
+income_groups$`Disposable Income` <-c("<$50", "$50-$100", "$100-$200", ">$200")
+
+
+kable(income_groups, format = 'latex')
+
+ggplot(data3%>%group_by(income)%>%count())+
+  geom_col(aes(x = income, y = n), fill = 'black')+
+      geom_label(aes(x=income, y=n/2, label = n))+
+      geom_label(aes(x=income, y=0, label = percent(n/nrow(data3))))+
+  labs(title = "Weekly Disposable Income Groups")+
+  xlab("Disposable Income")+
+  ylab("# of Students")+
+  scale_x_discrete(labels = c("<$50", "$50-$100", "$100-$200", ">$200"))+
+theme_pubr()+
+  theme(plot.title = element_text(hjust = 0.5, size = 12, face = 'bold'))
+
+  
+
+
+  
 
 #average time to finish survey
 avg_time <- as.numeric(data3%>%
@@ -150,17 +210,38 @@ ggplot()+
 }
 
 #count by class year
-class_year_count <- data3%>%
+class_year_count_responses <- data%>%
   group_by(Q5.1)%>%
   count()
 
-ggplot(class_year_count)+
+total_responses <- sum(class_year_count_responses$n)
+
+ggplot(class_year_count_responses)+
   geom_col(aes(x=Q5.1, y=n), fill = 'black')+
   geom_label(aes(x=Q5.1, y=n/2, label = n))+
-  scale_y_continuous(breaks = seq(0,120, 10))+
-  scale_x_discrete(limits = seq(2021,2026, 1))+
+  geom_label(aes(x=Q5.1, y=20, label = percent(n/sum(class_year_count_responses$n))))+
+  scale_y_continuous(breaks = seq(0,150, 10))+
+  scale_x_discrete(limits = seq(2021,2026,1))+
   theme_cowplot()+
-  labs(title = "Count of Responses by Class Year")+
+  labs(title = "Count of Total Responses by Class Year")+
+  xlab("Class Year")+
+  ylab("Count")+
+  theme(plot.title = element_text(hjust = 0.5))
+
+class_year_count_filtered <- data3%>%
+  group_by(Q5.1)%>%
+  count()
+colnames(class_year_count_filtered) <- c("Class Year", "# Useable Responses")
+kable(class_year_count_filtered, format = "latex")
+total_filtered_responses <- sum(class_year_count_filtered$n)
+
+ggplot(class_year_count_filtered)+
+  geom_col(aes(x=Q5.1, y=n), fill = 'black')+
+  geom_label(aes(x=Q5.1, y=n/2, label = n))+
+  geom_label(aes(x=Q5.1, y=20, label = percent(n/sum(class_year_count_filtered$n))))+
+  scale_y_continuous(breaks = seq(0,120, 10))+
+  theme_cowplot()+
+  labs(title = "Count of Filtered Responses by Class Year")+
   xlab("Class Year")+
   ylab("Count")+
   theme(plot.title = element_text(hjust = 0.5))
@@ -169,63 +250,70 @@ ggplot(class_year_count)+
 options(scipen = 999)
 
 #linear model for total impulse buying score
+data_glm_null <- glm(impulse_buy_score ~ 1, data = data3)
+summary(data_glm_null)
+
 data_glm <- glm(impulse_buy_score ~ extraversion + agreeableness + conscientiousness + neg_emotionality + open_mindedness, data = data3)
 summary(data_glm)                  
 anova(data_glm)
 vip(data_glm)
 
 data_glm2 <- glm(impulse_buy_score ~ extraversion + agreeableness + conscientiousness + neg_emotionality + open_mindedness + Q5.3, data = data3)
-
 summary(data_glm2)                  
 anova(data_glm2)
 vip(data_glm2)
 
-data_glm3 <- glm(impulse_buy_score ~ extraversion + agreeableness + conscientiousness + neg_emotionality + open_mindedness + Q5.3 + Q2.3, data = data3)
-
+data_glm3 <- glm(impulse_buy_score ~ extraversion + agreeableness + conscientiousness + neg_emotionality + open_mindedness + Q5.3 + income, data = data3)
 summary(data_glm3)                  
 anova(data_glm3)
 vip(data_glm3)
 
-data_glm4 <- glm(impulse_buy_score ~ extraversion + agreeableness + conscientiousness + neg_emotionality + open_mindedness + Q5.3 + Q2.3 + Q2.6, data = data3)
-
+data_glm4 <- glm(impulse_buy_score ~ extraversion + agreeableness + conscientiousness + neg_emotionality + open_mindedness + Q5.3 + income + Q2.6, data = data3)
 summary(data_glm4)                  
 anova(data_glm4)
 vip(data_glm4)
 
-data_glm5 <- glm(impulse_buy_score ~ extraversion + agreeableness + conscientiousness + neg_emotionality + open_mindedness + Q5.3 + Q2.3 + Q2.6 + Q2.4, data = data3)
-
+data_glm5 <- glm(impulse_buy_score ~ extraversion + agreeableness + conscientiousness + neg_emotionality + open_mindedness + Q5.3 + income + Q2.6 + Q2.4, data = data3)
 summary(data_glm5)                  
 anova(data_glm5)
 vip(data_glm5)
 
-data_glm6 <- glm(impulse_buy_score ~ extraversion + agreeableness + conscientiousness + neg_emotionality + open_mindedness + Q5.3 + Q2.3 + Q2.6 + Q2.4 + Q2.2_2, data = data3)
-
+data_glm6 <- glm(impulse_buy_score ~ extraversion + agreeableness + conscientiousness + neg_emotionality + open_mindedness + Q5.3 + income + Q2.6 + Q2.4 + Q2.2_2, data = data3)
 summary(data_glm6)                  
 anova(data_glm6)
 vip(data_glm6)
 
-data_glm7 <- glm(impulse_buy_score ~ extraversion + agreeableness + conscientiousness + neg_emotionality + open_mindedness + Q5.3 + Q2.3 + Q2.6 + Q2.4 + Q2.2_2 + Q2.2_3, data = data3)
-
+data_glm7 <- glm(impulse_buy_score ~ extraversion + agreeableness + conscientiousness + neg_emotionality + open_mindedness + Q5.3 + income + Q2.6 + Q2.4 + Q2.2_2 + Q2.2_3, data = data3)
 summary(data_glm7)                  
 anova(data_glm7)
 vip(data_glm7)
 
-data_glm8 <- glm(impulse_buy_score ~ extraversion + agreeableness + conscientiousness + neg_emotionality + open_mindedness + Q5.3 + Q2.3 + Q2.6 + Q2.4 + Q2.2_2 + Q2.2_3 + Q2.2_4, data = data3)
-
-summary(data_glm8)                  
+data_glm8 <- glm(impulse_buy_score ~ extraversion + agreeableness + conscientiousness + neg_emotionality + open_mindedness + Q5.3 + income + Q2.6 + Q2.4 + Q2.2_2 + Q2.2_3 + Q2.2_4, data = data3)
+summary(data_glm8) 
+rsq(data_glm8, adj = TRUE)
 anova(data_glm8)
 vip(data_glm8)
 
-data_glm9 <- glm(impulse_buy_score ~ extraversion + agreeableness + conscientiousness + neg_emotionality + open_mindedness + Q5.3 + Q2.3 + Q2.6 + Q2.4 + Q2.2_2 + Q2.2_3 + Q2.2_4 + Q2.2_8, data = data3)
-
-summary(data_glm9)                  
+data_glm9 <- glm(impulse_buy_score ~ extraversion + agreeableness + conscientiousness + neg_emotionality + open_mindedness + Q5.3 + income + Q2.6 + Q2.4 + Q2.2_2 + Q2.2_3 + Q2.2_4 + Q2.2_8, data = data3)
+summary(data_glm9) 
+rsq(data_glm9)
+rsq(data_glm9, adj = TRUE)
 anova(data_glm9)
-vip(data_glm9)
+vip(data_glm9)+labs(title="Variable Importance for Model 10")+theme_pubr()+theme(plot.title = element_text(hjust = 0.5))
 
+data_glm10 <- glm(impulse_buy_score ~ extraversion + conscientiousness + Q5.3 + income + Q2.6 + Q2.4 + Q2.2_2 + Q2.2_3 + Q2.2_8, data = data3)
+summary(data_glm10)
+rsq(data_glm10)
+rsq(data_glm10, adj = TRUE)
+anova(data_glm10)
+vip(data_glm10)+labs(title="Variable Importance for Model 11")+theme_pubr()+theme(plot.title = element_text(hjust = 0.5))
+
+glm_models <- list(data_glm_null, data_glm, data_glm2, data_glm3, data_glm4, data_glm5, data_glm6, data_glm7, data_glm8, data_glm9, data_glm10)
+stargazer(glm_models, type = "latex")
 #plot linear regression model tests
 {
 par(mfrow = c(2, 4))
-hist(residuals(data_glm9))
+hist(residuals(data_glm9), format = latex)
 
 # Plot residuals vs. fitted values
 plot(data_glm9$fitted.values, residuals(data_glm9), xlab = "Fitted values", ylab = "Residuals")
